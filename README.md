@@ -1,30 +1,130 @@
 # Coming Soon
 
-Minimal React/Vite signup page with a Node/Express endpoint that appends confirmed signups to the supplied Google Sheet.
+Minimal React/Vite signup page with a Node/Express endpoint. Subscriptions are appended to a CSV file on the DigitalOcean Droplet.
+
+## Privacy warning
+
+`https://agnesblow.com/signups.csv` is public by design. Anyone who knows or discovers the URL can download the email addresses and subscription timestamps. Do not use this setup unless subscribers are clearly told their addresses will be publicly accessible and that use complies with applicable privacy rules. To keep the list private, remove the public route and use an authenticated export or email service instead.
 
 ## Run locally
 
 1. Use Node.js 20 or newer.
 2. Run `npm install`.
-3. Copy `.env.example` to `.env` and complete the Google credentials as described below.
+3. Copy `.env.example` to `.env` if you want to change the local CSV path; by default it is `data/signups.csv`.
 4. Run `npm run dev` and open the Vite URL printed in the terminal.
-5. Run `npm test` for endpoint checks and `npm run build` for the production build.
+5. Run `npm test` for API checks and `npm run build` for the production build.
 
-Without valid Google credentials the endpoint returns an error and the page displays its retry message. It never reports a successful signup unless the email was already present in the sheet or Google confirms the append.
+A signup is confirmed only after the CSV file has been written successfully. Email addresses are trimmed and validated on client and server, deduplicated case-insensitively, and stored with a UTC ISO timestamp. Writes are serialized within the Node process. The rate limit is five requests per IP per 15 minutes per process.
 
-## Connect Google Sheets
+## Deploy on DigitalOcean Ubuntu
 
-1. In Google Cloud Console, create a project and enable the Google Sheets API.
-2. Create a service account and generate a JSON key. Keep the key private; do not commit `.env` or put these values in frontend or `VITE_*` variables.
-3. Share the existing spreadsheet with the service account's `client_email` as an Editor. The spreadsheet remains private.
-4. Set `GOOGLE_SHEETS_ID` to the spreadsheet ID and `GOOGLE_SHEETS_TAB` to the exact tab name (`Лист1` in the supplied spreadsheet).
-5. Put the service-account JSON in `GOOGLE_SERVICE_ACCOUNT_JSON` as a single-line JSON value. In the JSON string, encode private-key line breaks as `\n`.
-6. Keep columns A and B for email and the UTC subscription timestamp. The API reads existing emails for case-insensitive duplicate checks and appends new rows using the Sheets API `RAW` mode; it does not clear or overwrite existing cells.
+These steps add this app alongside other sites. They assume the Droplet already runs Nginx; do not replace its global config. Update only the virtual host for `agnesblow.com`.
 
-The supplied spreadsheet opened in the browser, but only without an authenticated Google account; no service-account credentials are available here. Therefore, live writes and the spreadsheet's current write permission have not been verified. The API and configuration path are prepared, and an unconfigured or denied write returns an error instead of a success state.
+### Install and build
 
-## Publish
+Run commands as `root` unless otherwise noted:
 
-Deploy as a Node.js web service (for example, Render, Railway, or another Node host) with Node.js 20+, build command `npm install && npm run build`, and start command `npm start`. Set the four server environment variables above in the host's secret settings. The same Express process serves the built site and `/api/signup`.
+```sh
+apt update
+apt install -y ca-certificates curl git
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+bash /tmp/nodesource_setup.sh
+apt install -y nodejs
+id agnesblow >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin agnesblow
+mkdir -p /opt/agnesblow /var/lib/agnesblow
+```
 
-The included rate limit allows five requests per IP per 15 minutes in a single server process. For multiple instances, replace its in-memory store with a shared rate-limit store. Configure the host's trusted-proxy setting deliberately before relying on forwarded client IP addresses.
+Push the project to the `master` branch of GitHub, then clone it on the server:
+
+```sh
+git clone -b master https://github.com/wladyslaw-wor/agnesblow.git /opt/agnesblow
+chown -R agnesblow:agnesblow /opt/agnesblow /var/lib/agnesblow
+runuser -u agnesblow -- sh -lc 'cd /opt/agnesblow && npm ci && npm run build'
+```
+
+The CSV is kept outside the repository at `/var/lib/agnesblow/signups.csv`, so pulling new code does not replace subscriber data. Set ownership and permissions for the service:
+
+```sh
+chown agnesblow:agnesblow /var/lib/agnesblow
+chmod 750 /var/lib/agnesblow
+```
+
+### Configure systemd
+
+Create `/etc/agnesblow.env`:
+
+```dotenv
+NODE_ENV=production
+PORT=3001
+HOST=127.0.0.1
+SIGNUPS_FILE=/var/lib/agnesblow/signups.csv
+```
+
+Create `/etc/systemd/system/agnesblow.service`:
+
+```ini
+[Unit]
+Description=agnesblow coming-soon website
+After=network.target
+
+[Service]
+Type=simple
+User=agnesblow
+Group=agnesblow
+WorkingDirectory=/opt/agnesblow
+EnvironmentFile=/etc/agnesblow.env
+ExecStart=/usr/bin/node server/index.js
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Check `command -v node` and adjust `ExecStart` if Node is installed elsewhere. Start the app:
+
+```sh
+systemctl daemon-reload
+systemctl enable --now agnesblow
+systemctl status agnesblow --no-pager
+journalctl -u agnesblow -n 50 --no-pager
+```
+
+### Nginx and direct CSV URL
+
+Back up the current Nginx virtual host for `agnesblow.com`. Add the following location inside its existing `server` block; leave other sites and server blocks alone:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:3001;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Then validate and reload Nginx:
+
+```sh
+nginx -t && systemctl reload nginx
+```
+
+The CSV is available at `https://agnesblow.com/signups.csv`. It includes a header row and the columns `email` and `subscribed_at_utc`. The endpoint sends `Cache-Control: no-store`; web crawlers are asked not to index it, but this does not make it private. Anyone can still open the direct URL.
+
+## Updating the deployment
+
+After pushing changes to `master`, update the app without touching the CSV:
+
+```sh
+cd /opt/agnesblow
+git pull --ff-only origin master
+runuser -u agnesblow -- sh -lc 'cd /opt/agnesblow && npm ci && npm run build'
+systemctl restart agnesblow
+systemctl status agnesblow --no-pager
+```
+
+The file-based rate limiter and write queue are per-process. Run exactly one app process as configured above; a process restart clears rate-limit counters but preserves CSV data. Keep regular protected backups of `/var/lib/agnesblow/signups.csv`.

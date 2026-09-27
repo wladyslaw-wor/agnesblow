@@ -10,6 +10,8 @@ export const siteConfig = {
     success: "You’re on the list. We’ll let you know when we go online.",
     invalidEmail: 'Please enter a valid email address.',
     error: 'Something went wrong. Please try again.',
+    publicListNotice: 'Email addresses and signup dates are publicly listed.',
+    publicListLink: 'View list',
   },
   assets: {
     background: '/assets/background.avif',

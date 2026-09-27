@@ -3,7 +3,7 @@ import { siteConfig } from './siteConfig'
 
 type SubmissionState = 'idle' | 'submitting' | 'success' | 'invalid' | 'error'
 
-const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const emailPattern = /^[A-Z0-9][A-Z0-9.!#$%&'*+/=?^_`{|}~-]{0,63}@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i
 
 function App() {
   const [email, setEmail] = useState('')
@@ -99,6 +99,9 @@ function App() {
             aria-live={submissionState === 'invalid' || submissionState === 'error' ? 'assertive' : 'polite'}
           >
             {message ?? ''}
+          </p>
+          <p className="privacy-notice">
+            {siteConfig.copy.publicListNotice} <a href="/signups.csv">{siteConfig.copy.publicListLink}</a>
           </p>
         </div>
       </section>

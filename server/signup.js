@@ -1,18 +1,58 @@
-import { google } from 'googleapis'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const EMAIL_PATTERN = /^[A-Z0-9][A-Z0-9.!#$%&'*+/=?^_`{|}~-]{0,63}@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i
 const WINDOW_MS = 15 * 60 * 1000
 const MAX_REQUESTS_PER_WINDOW = 5
 const requestCounts = new Map()
+const CSV_HEADER = 'email,subscribed_at_utc\n'
 
-function getServiceAccount() {
-  const rawCredentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-  if (!rawCredentials) return null
+function quoteCsv(value) {
+  return `"${String(value).replaceAll('"', '""')}"`
+}
 
+function parseCsvRows(contents) {
+  const rows = []
+  let row = []
+  let field = ''
+  let quoted = false
+
+  for (let index = 0; index < contents.length; index += 1) {
+    const character = contents[index]
+    if (quoted) {
+      if (character === '"' && contents[index + 1] === '"') {
+        field += '"'
+        index += 1
+      } else if (character === '"') {
+        quoted = false
+      } else {
+        field += character
+      }
+    } else if (character === '"' && field.length === 0) {
+      quoted = true
+    } else if (character === ',') {
+      row.push(field)
+      field = ''
+    } else if (character === '\n') {
+      row.push(field.replace(/\r$/, ''))
+      rows.push(row)
+      row = []
+      field = ''
+    } else {
+      field += character
+    }
+  }
+
+  if (field.length > 0 || row.length > 0) rows.push([...row, field])
+  return rows
+}
+
+async function readCsv(filePath) {
   try {
-    return JSON.parse(rawCredentials)
-  } catch {
-    throw new Error('Google service account credentials are not valid JSON')
+    return await readFile(filePath, 'utf8')
+  } catch (error) {
+    if (error.code === 'ENOENT') return ''
+    throw error
   }
 }
 
@@ -28,7 +68,9 @@ function isRateLimited(ipAddress) {
   return false
 }
 
-export function createSignupHandler() {
+export function createSignupHandler({ filePath = path.resolve('data/signups.csv') } = {}) {
+  let writeQueue = Promise.resolve()
+
   return async (request, response) => {
     if (isRateLimited(request.ip)) {
       return response.status(429).json({ ok: false })
@@ -41,51 +83,52 @@ export function createSignupHandler() {
       return response.status(400).json({ ok: false })
     }
 
-    const spreadsheetId = process.env.GOOGLE_SHEETS_ID
-    const sheetTab = process.env.GOOGLE_SHEETS_TAB
-    let credentials
     try {
-      credentials = getServiceAccount()
-    } catch (error) {
-      console.error(error)
-      return response.status(503).json({ ok: false })
-    }
-    if (!spreadsheetId || !sheetTab || !credentials) {
-      return response.status(503).json({ ok: false })
-    }
+      const saveTask = writeQueue.then(async () => {
+        await mkdir(path.dirname(filePath), { recursive: true })
+        let contents = await readCsv(filePath)
+        if (!contents) {
+          await writeFile(filePath, CSV_HEADER, { encoding: 'utf8', flag: 'wx', mode: 0o640 }).catch((error) => {
+            if (error.code !== 'EEXIST') throw error
+          })
+          contents = await readFile(filePath, 'utf8')
+        }
 
-    try {
-      const auth = new google.auth.GoogleAuth({
-        credentials,
-        scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+        const exists = parseCsvRows(contents).slice(1).some(
+          ([storedEmail]) => storedEmail?.trim().toLowerCase() === email.toLowerCase(),
+        )
+        if (!exists) {
+          await appendFile(filePath, `${quoteCsv(email)},${quoteCsv(new Date().toISOString())}\n`, {
+            encoding: 'utf8',
+            mode: 0o640,
+          })
+        }
+        return exists
       })
-      const sheets = google.sheets({ version: 'v4', auth })
-      const range = `'${sheetTab.replaceAll("'", "''")}'!A:A`
-      const existingRows = await sheets.spreadsheets.values.get({
-        spreadsheetId,
-        range,
-        valueRenderOption: 'UNFORMATTED_VALUE',
-      })
-      const exists = (existingRows.data.values ?? []).some(
-        ([storedEmail]) => typeof storedEmail === 'string' && storedEmail.trim().toLowerCase() === email.toLowerCase(),
-      )
-
-      if (!exists) {
-        await sheets.spreadsheets.values.append({
-          spreadsheetId,
-          range: `'${sheetTab.replaceAll("'", "''")}'!A:B`,
-          valueInputOption: 'RAW',
-          insertDataOption: 'INSERT_ROWS',
-          requestBody: {
-            values: [[email, new Date().toISOString()]],
-          },
-        })
-      }
+      writeQueue = saveTask.catch(() => {})
+      const exists = await saveTask
 
       return response.status(200).json({ ok: true, duplicate: exists })
     } catch (error) {
-      console.error('Google Sheets signup failed:', error)
-      return response.status(503).json({ ok: false })
+      console.error('CSV signup write failed:', error)
+      return response.status(500).json({ ok: false })
+    }
+  }
+}
+
+export function createCsvHandler({ filePath = path.resolve('data/signups.csv') } = {}) {
+  return async (_request, response) => {
+    try {
+      const contents = (await readCsv(filePath)) || CSV_HEADER
+      response.set({
+        'Cache-Control': 'no-store',
+        'Content-Disposition': 'inline; filename="signups.csv"',
+        'X-Robots-Tag': 'noindex, nofollow',
+      })
+      return response.type('text/csv').send(contents)
+    } catch (error) {
+      console.error('CSV signup read failed:', error)
+      return response.status(500).type('text/plain').send('Unable to read signup list.')
     }
   }
 }
