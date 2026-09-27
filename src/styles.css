@@ -152,19 +152,6 @@ input:focus-visible {
   text-align: center;
 }
 
-.privacy-notice {
-  margin: 12px 0 0;
-  font-size: 10px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.privacy-notice a {
-  color: inherit;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
-}
-
 .honeypot,
 .visually-hidden {
   position: absolute;

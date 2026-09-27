@@ -100,9 +100,6 @@ function App() {
           >
             {message ?? ''}
           </p>
-          <p className="privacy-notice">
-            {siteConfig.copy.publicListNotice} <a href="/signups.csv">{siteConfig.copy.publicListLink}</a>
-          </p>
         </div>
       </section>
     </main>
