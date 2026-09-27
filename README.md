@@ -18,11 +18,13 @@ A signup is confirmed only after the CSV file has been written successfully. Ema
 
 ## Deploy on DigitalOcean Ubuntu
 
-These steps add this app alongside other sites. They assume the Droplet already runs Nginx; do not replace its global config. Update only the virtual host for `agnesblow.com`.
+The existing React site on the Droplet belongs to another project/domain and is not changed by this deployment. `agnesblow.com` is configured as a separate new Nginx virtual host and systemd service. Do not edit the other site's files or Nginx server block.
+
+The requested systemd process runs as `root`. This is less secure than running Node as a dedicated service user: a vulnerability in the app or a dependency could grant full server access. The app only needs an unprivileged port and access to its own CSV, so a dedicated user is strongly recommended. The steps below honor the request to run under root.
 
 ### Install and build
 
-Run commands as `root` unless otherwise noted:
+Run on the Droplet as `root`:
 
 ```sh
 apt update
@@ -30,26 +32,25 @@ apt install -y ca-certificates curl git
 curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
 bash /tmp/nodesource_setup.sh
 apt install -y nodejs
-id agnesblow >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin agnesblow
-mkdir -p /opt/agnesblow /var/lib/agnesblow
+node --version
+npm --version
+mkdir -p /var/www/agnesblow /var/lib/agnesblow
 ```
 
-Push the project to the `master` branch of GitHub, then clone it on the server:
+Keep the existing React site's files where they are. Clone this app into its own directory; do not clone over the existing site's document root:
 
 ```sh
-git clone -b master https://github.com/wladyslaw-wor/agnesblow.git /opt/agnesblow
-chown -R agnesblow:agnesblow /opt/agnesblow /var/lib/agnesblow
-runuser -u agnesblow -- sh -lc 'cd /opt/agnesblow && npm ci && npm run build'
-```
-
-The CSV is kept outside the repository at `/var/lib/agnesblow/signups.csv`, so pulling new code does not replace subscriber data. Set ownership and permissions for the service:
-
-```sh
-chown agnesblow:agnesblow /var/lib/agnesblow
+git clone -b master https://github.com/wladyslaw-wor/agnesblow.git /var/www/agnesblow
+cd /var/www/agnesblow
+npm ci
+npm test
+npm run build
 chmod 750 /var/lib/agnesblow
 ```
 
-### Configure systemd
+The CSV lives outside the repository at `/var/lib/agnesblow/signups.csv`, so code updates do not replace collected addresses.
+
+### Configure systemd as root
 
 Create `/etc/agnesblow.env`:
 
@@ -69,9 +70,9 @@ After=network.target
 
 [Service]
 Type=simple
-User=agnesblow
-Group=agnesblow
-WorkingDirectory=/opt/agnesblow
+User=root
+Group=root
+WorkingDirectory=/var/www/agnesblow
 EnvironmentFile=/etc/agnesblow.env
 ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
@@ -83,18 +84,61 @@ PrivateTmp=true
 WantedBy=multi-user.target
 ```
 
-Check `command -v node` and adjust `ExecStart` if Node is installed elsewhere. Start the app:
+Check `command -v node`; adjust `ExecStart` if the binary is not `/usr/bin/node`. Start and test the service before changing Nginx:
 
 ```sh
 systemctl daemon-reload
 systemctl enable --now agnesblow
 systemctl status agnesblow --no-pager
 journalctl -u agnesblow -n 50 --no-pager
+curl -fsS http://127.0.0.1:3001/ >/dev/null && echo "New app is ready"
 ```
 
-### Nginx and direct CSV URL
+### Add the new domain to Nginx
 
-Back up the current Nginx virtual host for `agnesblow.com`. Add the following location inside its existing `server` block; leave other sites and server blocks alone:
+Point DNS `A` records for `agnesblow.com` and `www.agnesblow.com` to the Droplet's public IPv4 address. If there are `AAAA` records, they must point to this server too; otherwise remove them. Confirm Nginx is active and the domain is not already configured:
+
+```sh
+systemctl is-active nginx
+nginx -T | grep -n 'server_name'
+```
+
+Create a new `/etc/nginx/sites-available/agnesblow.com` file. This is a new server block for this domain; it does not replace or edit the unrelated React site's virtual host:
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name agnesblow.com www.agnesblow.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Enable only the new domain and validate the full Nginx configuration before reloading:
+
+```sh
+ln -s /etc/nginx/sites-available/agnesblow.com /etc/nginx/sites-enabled/agnesblow.com
+nginx -t && systemctl reload nginx
+curl -I http://agnesblow.com/
+```
+
+Once HTTP works and DNS has propagated, add HTTPS with Certbot:
+
+```sh
+apt install -y certbot python3-certbot-nginx
+certbot --nginx -d agnesblow.com -d www.agnesblow.com
+certbot renew --dry-run
+```
+
+Certbot may add an HTTPS server block to this new site's config. Check and reload Nginx after it completes. The proxy location should remain:
 
 ```nginx
 location / {
@@ -107,24 +151,36 @@ location / {
 }
 ```
 
-Then validate and reload Nginx:
+Verify the public site and public CSV URL:
 
 ```sh
+curl -I https://agnesblow.com/
+curl -fsS https://agnesblow.com/signups.csv
+```
+
+The CSV URL is public and contains emails and UTC signup timestamps. `noindex` and `no-store` headers do not restrict access.
+
+### Roll back this domain
+
+If you need to disable this deployment, disable only the new `agnesblow.com` virtual host. The unrelated React site and its Nginx config are not involved:
+
+```sh
+rm /etc/nginx/sites-enabled/agnesblow.com
 nginx -t && systemctl reload nginx
 ```
 
-The CSV is available at `https://agnesblow.com/signups.csv`. It includes a header row and the columns `email` and `subscribed_at_utc`. The endpoint sends `Cache-Control: no-store`; web crawlers are asked not to index it, but this does not make it private. Anyone can still open the direct URL.
+### Updating this deployment
 
-## Updating the deployment
-
-After pushing changes to `master`, update the app without touching the CSV:
+After pushing changes to `master`, update code and restart only this service. Do not pull into the old React site's document root:
 
 ```sh
-cd /opt/agnesblow
-git pull --ff-only origin master
-runuser -u agnesblow -- sh -lc 'cd /opt/agnesblow && npm ci && npm run build'
+cd /var/www/agnesblow
+
+npm ci
+npm test
+npm run build
 systemctl restart agnesblow
 systemctl status agnesblow --no-pager
 ```
 
-The file-based rate limiter and write queue are per-process. Run exactly one app process as configured above; a process restart clears rate-limit counters but preserves CSV data. Keep regular protected backups of `/var/lib/agnesblow/signups.csv`.
+The CSV at `/var/lib/agnesblow/signups.csv` is untouched. Run one Node process so its write queue and per-IP rate limit remain effective. Back up the CSV to a protected location regularly.
