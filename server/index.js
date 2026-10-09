@@ -18,7 +18,9 @@ app.post('/api/signup', createSignupHandler({ filePath: signupsFile }))
 
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(projectRoot, 'dist'), { index: false, maxAge: '1h' }))
-  app.get('*path', (_request, response) => response.sendFile(path.join(projectRoot, 'dist', 'index.html')))
+  app.get('*path', (request, response) => {
+    response.status(request.path === '/' ? 200 : 404).sendFile(path.join(projectRoot, 'dist', 'index.html'))
+  })
 }
 
 app.listen(port, host, () => {

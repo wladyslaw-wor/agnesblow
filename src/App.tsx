@@ -6,6 +6,7 @@ type SubmissionState = 'idle' | 'submitting' | 'success' | 'invalid' | 'error'
 const emailPattern = /^[A-Z0-9][A-Z0-9.!#$%&'*+/=?^_`{|}~-]{0,63}@[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?)+$/i
 
 function App() {
+  const isNotFound = window.location.pathname !== '/'
   const [email, setEmail] = useState('')
   const [submissionState, setSubmissionState] = useState<SubmissionState>('idle')
   const [pointer, setPointer] = useState({ x: 50, y: 36 })
@@ -74,68 +75,77 @@ function App() {
         <div className="grain" />
       </div>
 
-      <header className="topbar">
-        <a href="#" className="brand-mark" aria-label="Agnes Blow home">
-          AB
-        </a>
-        <div className="status-pill">
-          <span className="dot" aria-hidden="true" />
-          <span>Coming soon</span>
-        </div>
-      </header>
+      {!isNotFound && (
+        <header className="topbar">
+          <div className="status-pill">
+            <span className="dot" aria-hidden="true" />
+            <span>Coming soon</span>
+          </div>
+        </header>
+      )}
 
-      <div className="content-shell">
-        <h1 className="sr-only">{siteConfig.copy.heading}</h1>
-        <img className="brand-logo" src={siteConfig.assets.logo} alt={siteConfig.assets.logoAlt} />
+      {isNotFound ? (
+        <section className="not-found-content" aria-labelledby="not-found-title">
+          <p className="not-found-code" aria-hidden="true">404</p>
+          <h1 id="not-found-title">Page not found</h1>
+          <a className="home-link" href="/">
+            Back to home <span aria-hidden="true">→</span>
+          </a>
+        </section>
+      ) : (
+        <div className="content-shell">
+          <h1 className="sr-only">{siteConfig.copy.heading}</h1>
+          <img className="brand-logo" src={siteConfig.assets.logo} alt={siteConfig.assets.logoAlt} />
 
-        <div className="form-row">
-          {submissionState === 'success' ? (
-            <div className="success-text" role="status" aria-live="polite">
-              {siteConfig.copy.success}
-            </div>
-          ) : (
-            <form className="signup-form" onSubmit={handleSubmit} noValidate>
-              <label className="visually-hidden" htmlFor="email-address">
-                {siteConfig.copy.emailLabel}
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                inputMode="email"
-                placeholder={siteConfig.copy.emailPlaceholder}
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value)
-                  if (submissionState !== 'submitting') setSubmissionState('idle')
-                }}
-                aria-invalid={submissionState === 'invalid'}
-                aria-describedby={message ? 'form-message' : undefined}
-                required
-              />
-              <div className="honeypot" aria-hidden="true">
-                <label htmlFor="website">Leave this field empty</label>
-                <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+          <div className="form-row">
+            {submissionState === 'success' ? (
+              <div className="success-text" role="status" aria-live="polite">
+                {siteConfig.copy.success}
               </div>
-              <button type="submit" disabled={submissionState === 'submitting'}>
-                {submissionState === 'submitting' ? siteConfig.copy.submitting : siteConfig.copy.submit}
-              </button>
-            </form>
+            ) : (
+              <form className="signup-form" onSubmit={handleSubmit} noValidate>
+                <label className="visually-hidden" htmlFor="email-address">
+                  {siteConfig.copy.emailLabel}
+                </label>
+                <input
+                  id="email-address"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder={siteConfig.copy.emailPlaceholder}
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value)
+                    if (submissionState !== 'submitting') setSubmissionState('idle')
+                  }}
+                  aria-invalid={submissionState === 'invalid'}
+                  aria-describedby={message ? 'form-message' : undefined}
+                  required
+                />
+                <div className="honeypot" aria-hidden="true">
+                  <label htmlFor="website">Leave this field empty</label>
+                  <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+                </div>
+                <button type="submit" disabled={submissionState === 'submitting'}>
+                  {submissionState === 'submitting' ? siteConfig.copy.submitting : siteConfig.copy.submit}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {message && submissionState !== 'success' && (
+            <p
+              id="form-message"
+              className="form-message"
+              role={submissionState === 'invalid' || submissionState === 'error' ? 'alert' : 'status'}
+              aria-live={submissionState === 'invalid' || submissionState === 'error' ? 'assertive' : 'polite'}
+            >
+              {message}
+            </p>
           )}
         </div>
-
-        {message && submissionState !== 'success' && (
-          <p
-            id="form-message"
-            className="form-message"
-            role={submissionState === 'invalid' || submissionState === 'error' ? 'alert' : 'status'}
-            aria-live={submissionState === 'invalid' || submissionState === 'error' ? 'assertive' : 'polite'}
-          >
-            {message}
-          </p>
-        )}
-      </div>
+      )}
     </main>
   )
 }
