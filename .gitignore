@@ -1,5 +1,45 @@
+# dependencies
 node_modules/
-dist/
+
+# build output
+/dist/
+/build/
+.vite/
+*.tsbuildinfo
+
+# environment / secrets
 .env
+.env.*
+!.env.example
+
+# runtime data
 /data/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# local app data / uploads
+public/uploads/
+public/assets/*.jpg
+public/assets/*.png
+public/assets/*.jpeg
+public/assets/*.webp
+public/assets/*.avif
+!public/assets/backdrop.jpg
+!public/assets/logo.png
+
+# design source / working files
+/design/
+*.psd
+*.ai
+*.sketch
+
+# OS/editor junk
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo

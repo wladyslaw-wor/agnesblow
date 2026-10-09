@@ -1,12 +1,15 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
+
 :root {
-  font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
-  color: #111;
-  background: #fff;
+  color: #f1eeea;
+  background: #050505;
+  font-family: 'IBM Plex Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-optical-sizing: auto;
+  line-height: 1.5;
 }
 
 * {
@@ -25,6 +28,7 @@ body,
 body {
   min-height: 100vh;
   min-height: 100svh;
+  background: #050505;
 }
 
 button,
@@ -32,128 +36,240 @@ input {
   font: inherit;
 }
 
-.page {
-  display: grid;
-  grid-template-columns: minmax(0, 1.22fr) minmax(390px, 0.78fr);
-  min-height: 100vh;
-  min-height: 100svh;
-  background: #fff;
-  font-family: var(--site-font);
+img {
+  max-width: 100%;
 }
 
-.image-panel {
+button,
+input {
+  border: 0;
+  border-radius: 0;
+}
+
+.page-shell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100svh;
   overflow: hidden;
-  background: #fff;
+  background: #050505;
+  color: #f1eeea;
+  font-family: var(--site-font);
+}
+
+.background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .background-image {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 100vh;
-  min-height: 100svh;
   object-fit: cover;
-  object-position: var(--desktop-image-position);
-}
-
-.signup-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: max(48px, env(safe-area-inset-top)) 40px max(48px, env(safe-area-inset-bottom));
-  background: #fff;
-}
-
-.logo {
-  display: block;
-  width: var(--desktop-logo-width);
-  height: auto;
-  margin: 0 auto 104px;
-  object-fit: contain;
-}
-
-.signup-content {
-  width: min(100%, var(--content-width));
-}
-
-h1 {
-  margin: 0 0 24px;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.5;
-  text-align: center;
-}
-
-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  width: 100%;
-  min-height: 52px;
-  border: 1px solid #111;
-}
-
-form:focus-within {
-  outline: 2px solid #111;
-  outline-offset: 3px;
-}
-
-input[type='email'] {
-  width: 100%;
-  min-width: 0;
-  min-height: 50px;
-  padding: 0 15px;
-  border: 0;
-  border-radius: 0;
-  outline: 0;
-  color: #111;
-  background: #fff;
-  font-size: 14px;
-}
-
-input[type='email']::placeholder {
-  color: #686868;
+  object-position: 50% 26%;
+  transform-origin: 50% 30%;
   opacity: 1;
 }
 
-button {
-  min-width: 118px;
-  min-height: 50px;
-  padding: 0 18px;
-  border: 0;
-  border-left: 1px solid #111;
-  border-radius: 0;
-  color: #fff;
-  background: #111;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
+.spotlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 760px;
+  height: 760px;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(circle, rgba(196, 206, 222, 0.2) 0%, rgba(196, 206, 222, 0.08) 38%, rgba(196, 206, 222, 0) 70%);
+  transform: translate(calc(var(--pointer-x) - 50%), calc(var(--pointer-y) - 50%));
+  transition: transform 150ms ease-out;
 }
 
-button:disabled {
-  cursor: wait;
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 36%, rgba(5, 5, 5, 0) 38%, rgba(5, 5, 5, 0.6) 100%);
 }
 
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid #111;
-  outline-offset: 3px;
+.page-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(5, 5, 5, 0.65) 0%, rgba(5, 5, 5, 0) 18%), linear-gradient(to top, rgba(5, 5, 5, 0.94) 0%, rgba(5, 5, 5, 0.7) 22%, rgba(5, 5, 5, 0.22) 42%, rgba(5, 5, 5, 0) 58%);
+}
+
+.grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0.14;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.topbar,
+.content-shell {
+  position: relative;
   z-index: 1;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px clamp(20px, 3vw, 48px);
+}
+
+.brand-mark {
+  font-family: 'Bodoni Moda', Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #f1eeea;
+  text-decoration: none;
+}
+
+.brand-mark:hover,
+.brand-mark:focus-visible {
+  color: #fff;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f1eeea;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f1eeea;
+}
+
+.content-shell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: clamp(20px, 3vw, 40px);
+  padding: 0 clamp(20px, 3vw, 48px) clamp(20px, 3vw, 40px);
+}
+
+.brand-logo {
+  display: block;
+  width: clamp(260px, 40vw, 780px);
+  max-width: 100%;
+  height: auto;
+  margin-left: -1vw;
+}
+
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px 48px;
+  max-width: min(100%, 600px);
+  padding-top: 22px;
+  border-top: 1px solid rgba(241, 238, 234, 0.3);
+}
+
+.signup-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  width: min(100%, 500px);
+}
+
+.signup-form input[type='email'] {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(241, 238, 234, 0.5);
+  padding: 12px 0;
+  color: #f1eeea;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.signup-form input[type='email']::placeholder {
+  color: rgba(241, 238, 234, 0.72);
+  opacity: 1;
+}
+
+.signup-form input[type='email']:focus {
+  border-bottom-color: #fff;
+}
+
+.signup-form button {
+  padding: 12px 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  color: #f1eeea;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.signup-form button:hover,
+.signup-form button:focus-visible {
+  border-bottom-color: #f1eeea;
+  color: #fff;
+}
+
+.signup-form button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.form-message,
+.success-text {
+  max-width: min(100%, 500px);
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f1eeea;
+}
+
+.success-text {
+  padding: 12px 0;
 }
 
 .form-message {
   min-height: 21px;
-  margin: 14px 0 0;
+  padding-top: 4px;
   font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
+  letter-spacing: 0.12em;
+  text-transform: none;
+  color: #f1eeea;
 }
 
 .honeypot,
-.visually-hidden {
+.visually-hidden,
+.sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -163,73 +279,67 @@ input:focus-visible {
   clip-path: inset(50%);
 }
 
-@media (max-width: 900px) {
-  .page {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    min-height: 100svh;
+@media (max-width: 720px) {
+  .topbar {
+    padding-top: 20px;
   }
 
-  .signup-panel {
-    order: 0;
-    flex: 0 0 auto;
-    padding: max(20px, env(safe-area-inset-top)) 24px 17px;
-  }
-
-  .logo {
-    width: var(--mobile-logo-width);
-    margin-bottom: 18px;
-  }
-
-  .signup-content {
-    width: min(100%, 440px);
-  }
-
-  h1 {
-    margin-bottom: 12px;
+  .status-pill {
     font-size: 11px;
+    letter-spacing: 0.14em;
   }
 
-  form {
-    min-height: 50px;
+  .content-shell {
+    padding-bottom: 28px;
   }
 
-  input[type='email'],
-  button {
-    min-height: 48px;
+  .brand-logo {
+    width: min(82vw, 420px);
+    margin-left: 0;
   }
 
-  button {
-    min-width: 106px;
-    padding: 0 12px;
+  .form-row,
+  .signup-form {
+    width: 100%;
   }
 
-  .form-message {
-    margin-top: 8px;
+  .signup-form {
+    gap: 14px;
+  }
+
+  .signup-form button {
     font-size: 11px;
-  }
-
-  .image-panel {
-    order: 1;
-    flex: 1 0 45svh;
-    min-height: 45svh;
-  }
-
-  .background-image {
-    min-height: 45svh;
-    object-position: var(--mobile-image-position);
+    letter-spacing: 0.12em;
   }
 }
 
-@media (max-width: 380px) {
-  .signup-panel {
+@media (max-width: 480px) {
+  .page-shell {
+    min-height: 100svh;
+  }
+
+  .topbar {
     padding-right: 18px;
     padding-left: 18px;
   }
 
-  button {
-    min-width: 98px;
-    padding: 0 10px;
+  .content-shell {
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+
+  .signup-form {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .signup-form button {
+    width: fit-content;
+    padding-bottom: 10px;
+  }
+
+  .status-pill {
+    gap: 8px;
   }
 }
